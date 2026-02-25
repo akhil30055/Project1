@@ -3,284 +3,179 @@ import pandas as pd
 import plotly.express as px
 import os
 import io
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
 
-st.set_page_config(page_title="SSC CGL 2025 Real SSC Rule Predictor", layout="wide")
+st.set_page_config(layout="wide")
 
-# ---------------- DATA LOADING ---------------- #
+# ---------------- LOAD DATA ---------------- #
 
 @st.cache_data
-def load_and_clean_data(file_name):
+def load_data(file):
 
-    if not os.path.exists(file_name):
-        return None, None
+    df = pd.read_csv(file, encoding="latin1", on_bad_lines="skip")
 
-    df = pd.read_csv(file_name, encoding='latin1', on_bad_lines='skip')
-    df.columns = [str(c).strip() for c in df.columns]
+    df["Main Paper Marks"] = pd.to_numeric(df["Main Paper Marks"], errors="coerce")
+    df["Computer Marks"] = pd.to_numeric(df["Computer Marks"], errors="coerce")
 
-    key_col = 'Roll Number' if 'Roll Number' in df.columns else df.columns[0]
+    df = df.dropna(subset=["Main Paper Marks","Computer Marks","Category"])
 
-    df['Main Paper Marks'] = pd.to_numeric(df['Main Paper Marks'], errors='coerce')
-    df['Computer Marks'] = pd.to_numeric(df['Computer Marks'], errors='coerce')
-
-    df = df.dropna(subset=['Main Paper Marks', 'Category', 'Computer Marks'])
-
-    return df, key_col
+    return df
 
 
-@st.cache_data
-def load_stat_data(file_name):
+# ---------------- FULL OFFICIAL VACANCY ---------------- #
 
-    if not os.path.exists(file_name):
-        return None, None
-
-    df = pd.read_csv(file_name, encoding='latin1', on_bad_lines='skip')
-
-    key_col = 'Roll Number' if 'Roll Number' in df.columns else df.columns[0]
-
-    df['Stat Marks'] = pd.to_numeric(df.get('Stat Marks', 0), errors='coerce')
-
-    return df[[key_col, 'Stat Marks']], key_col
-
-
-# ---------------- VACANCY ---------------- #
-
-def get_full_vacancy_list():
+def get_all_vacancies():
 
     return [
 
-        ("L-7","CSS ASO",273,104,52,185,68,682,True,False),
-        ("L-7","MEA ASO",44,13,0,33,10,100,True,False),
-        ("L-7","CBIC Inspector Examiner",68,18,24,13,14,137,True,False),
-        ("L-7","CBIC Inspector Preventive",138,75,20,91,29,353,True,False),
-        ("L-7","CBIC Inspector Excise",611,175,82,269,169,1306,True,False),
-        ("L-7","CBDT Inspector",176,52,39,95,27,389,False,False),
+("L7","Inspector Examiner",68,18,24,13,14),
+("L7","Inspector Preventive",138,75,20,91,29),
+("L7","EPFO ASO",36,17,5,30,6),
+("L7","Inspector Excise",611,175,82,269,169),
+("L7","AEO ED",1,2,2,13,0),
+("L7","NIC ASO",2,0,0,0,1),
+("L7","CAT ASO",0,0,0,0,1),
+("L7","CBN Inspector",1,1,0,1,1),
+("L7","MEA ASO",44,13,0,33,10),
+("L7","ECI ASO",0,0,0,5,1),
+("L7","Meity ASO",2,0,1,0,0),
+("L7","IB ASO",100,24,19,39,15),
+("L7","CBI SI",52,12,5,18,6),
+("L7","Railway ASO",23,4,4,14,3),
+("L7","Income Tax Inspector",176,52,39,95,27),
+("L7","CSS ASO",273,104,52,185,68),
 
-        ("L-6","CBDT Office Superintendent",2766,1012,496,1822,657,6753,False,False),
+("L6","Executive Assistant",89,24,12,40,18),
+("L6","Assistant ED",0,0,0,3,0),
+("L6","Stat Investigator",50,18,12,28,10),
+("L6","Assistant TRAI",2,1,0,0,0),
+("L6","Assistant Language",4,0,0,1,0),
+("L6","Assistant MCA",0,1,0,0,0),
+("L6","Assistant Mines",11,2,2,3,4),
+("L6","Assistant Textiles",1,0,0,0,0),
+("L6","Assistant Coast Guard",8,3,1,5,1),
+("L6","JSO",124,47,15,36,27),
+("L6","Assistant DFSS",1,0,0,1,1),
+("L6","ASO NCB",7,1,1,2,0),
+("L6","SI NCB",10,3,4,8,5),
+("L6","SI NIA",6,2,1,3,2),
+("L6","Assistant MOSPI",0,0,0,2,0),
+("L6","Office Superintendent",2766,1012,496,1822,657),
 
-        ("L-5","CGDA Auditor",477,176,88,316,117,1174,False,False),
+("L5","Accountant CAG",86,31,17,28,18),
+("L5","Auditor CGDA",477,176,88,316,117),
+("L5","Accountant Post",42,13,6,12,3),
+("L5","Accountant CGCA",15,6,3,9,3),
 
-        ("L-4","CBIC Tax Assistant",256,136,82,203,94,771,True,False),
-        ("L-4","CBDT Tax Assistant",572,171,80,340,86,1249,False,False)
+("L4","UDC MSME",25,4,5,16,5),
+("L4","Tax Assistant CBIC",256,136,82,203,94),
+("L4","UDC Science",24,9,4,16,6),
+("L4","UDC Narcotics",12,2,0,5,2),
+("L4","SI Narcotics",11,2,0,6,0),
+("L4","UDC Mines",13,2,3,4,4),
+("L4","UDC DGDE",7,2,1,3,1),
+("L4","UDC Meity",5,1,1,2,1),
+("L4","UDC Textiles",4,0,1,1,2),
+("L4","UDC Water",5,0,0,0,0),
+("L4","UDC BRO",20,1,0,0,4),
+("L4","UDC Agriculture",2,0,0,0,1),
+("L4","UDC Health",1,0,0,0,0),
+("L4","Tax Assistant CBDT",572,171,80,340,86),
 
     ]
 
 
-# ---------------- SSC REAL ENGINE ---------------- #
+# ---------------- REAL SSC ENGINE ---------------- #
 
-def ssc_real_allocation(df, posts_df):
+def allocate(df, vacancies):
 
-    df = df.copy()
-    posts = posts_df.copy()
-
-    computer_cutoff = {"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
-
-    df["Computer_Qualified"] = df["Computer Marks"] >= df["Category"].map(computer_cutoff)
+    computer_cut = {"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
 
     df = df.sort_values("Main Paper Marks", ascending=False).reset_index(drop=True)
 
-    df["Allocated_Post"] = None
-    df["Allocated_Category"] = None
+    df["Post"]=None
+    df["Allotted_Category"]=None
 
-    vacancy = posts.to_dict("index")
+    vacancy_dict=[]
 
-    for i, candidate in df.iterrows():
+    for v in vacancies:
 
-        if not candidate["Computer_Qualified"]:
-            continue
+        level,post,ur,sc,st,obc,ews=v
 
-        for p in vacancy:
-
-            post = vacancy[p]
-
-            if post["UR"] > 0:
-
-                vacancy[p]["UR"] -= 1
-                df.at[i,"Allocated_Post"] = post["Post"]
-                df.at[i,"Allocated_Category"] = "UR"
-                break
-
-            cat = candidate["Category"]
-
-            if cat in ["OBC","EWS","SC","ST"]:
-
-                if post[cat] > 0:
-
-                    vacancy[p][cat] -= 1
-                    df.at[i,"Allocated_Post"] = post["Post"]
-                    df.at[i,"Allocated_Category"] = cat
-                    break
-
-    cutoff_df = df[df["Allocated_Post"].notnull()]
-
-    cutoff_df = cutoff_df.groupby(
-        ["Allocated_Post","Allocated_Category"]
-    )["Main Paper Marks"].min().reset_index()
-
-    result = {}
-
-    for _,row in cutoff_df.iterrows():
-
-        post=row["Allocated_Post"]
-        cat=row["Allocated_Category"]
-        cutoff=row["Main Paper Marks"]
-
-        if post not in result:
-            result[post]={"Cutoff":{}}
-
-        result[post]["Cutoff"][cat]=cutoff
-
-    return result, df
-
-
-# ---------------- PDF ---------------- #
-
-def generate_pdf(df):
-
-    buffer = io.BytesIO()
-
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-
-    table = Table([df.columns.tolist()] + df.values.tolist())
-
-    table.setStyle(TableStyle([
-        ('GRID',(0,0),(-1,-1),0.5,colors.black)
-    ]))
-
-    doc.build([table])
-
-    buffer.seek(0)
-
-    return buffer
-
-
-# ---------------- UI ---------------- #
-
-st.title("SSC CGL Real Allocation Predictor")
-
-st.sidebar.header("Enter Your Marks")
-
-u_marks = st.sidebar.number_input("Main Marks",0.0,390.0,310.0)
-u_comp = st.sidebar.number_input("Computer Marks",0.0,60.0,25.0)
-u_cat = st.sidebar.selectbox("Category",["UR","OBC","EWS","SC","ST"])
-
-MAIN_FILE="CSV - SSC CGL Mains 2025 Marks List.xlsx - in.csv"
-
-df_main,key=load_and_clean_data(MAIN_FILE)
-
-if df_main is not None:
-
-    df_main["Stat Marks"]=0
-
-    posts=get_full_vacancy_list()
-
-    posts_df=pd.DataFrame(posts,columns=[
-        "Level","Post","UR","SC","ST","OBC","EWS",
-        "Total","IsCPT","IsStat"
-    ])
-
-    # INSERT USER
-
-    user_row={
-        key:"USER",
-        "Main Paper Marks":u_marks,
-        "Computer Marks":u_comp,
-        "Stat Marks":0,
-        "Category":u_cat
-    }
-
-    df_with_user=pd.concat([df_main,pd.DataFrame([user_row])],ignore_index=True)
-
-    result,allocated_df=ssc_real_allocation(df_with_user,posts_df)
-
-    allocated_df=allocated_df.sort_values(
-        "Main Paper Marks",ascending=False
-    ).reset_index(drop=True)
-
-    allocated_df["Rank"]=allocated_df.index+1
-
-    user=allocated_df[allocated_df[key]=="USER"].iloc[0]
-
-    st.subheader("Prediction Result")
-
-    c1,c2,c3=st.columns(3)
-
-    c1.metric("Predicted Rank",user["Rank"])
-
-    qualified=allocated_df[
-        allocated_df["Computer Marks"]>=
-        allocated_df["Category"].map(
-            {"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
-        )
-    ]
-
-    qualified=qualified.reset_index(drop=True)
-
-    qualified["CPT Rank"]=qualified.index+1
-
-    if "USER" in qualified[key].values:
-
-        cpt_rank=qualified[qualified[key]=="USER"]["CPT Rank"].values[0]
-
-    else:
-
-        cpt_rank="Not Qualified"
-
-    c2.metric("CPT Rank",cpt_rank)
-
-    post=user["Allocated_Post"]
-
-    if post:
-
-        c3.metric("Allocated Post",post)
-
-        st.success(f"Category: {user['Allocated_Category']}")
-
-    else:
-
-        c3.metric("Allocated Post","Not Selected")
-
-        st.error("Not selected")
-
-    # Cutoff Table
-
-    rows=[]
-
-    for post,data in result.items():
-
-        rows.append({
+        vacancy_dict.append({
+            "Level":level,
             "Post":post,
-            "UR":data["Cutoff"].get("UR",""),
-            "OBC":data["Cutoff"].get("OBC",""),
-            "EWS":data["Cutoff"].get("EWS",""),
-            "SC":data["Cutoff"].get("SC",""),
-            "ST":data["Cutoff"].get("ST","")
+            "UR":ur,
+            "OBC":obc,
+            "EWS":ews,
+            "SC":sc,
+            "ST":st
         })
 
-    cutoff_df=pd.DataFrame(rows)
+    for i,row in df.iterrows():
 
-    st.subheader("Cutoff Table")
+        if row["Computer Marks"] < computer_cut[row["Category"]]:
+            continue
 
-    st.dataframe(cutoff_df,use_container_width=True)
+        for post in vacancy_dict:
 
-    # Distribution Chart
+            if post["UR"]>0:
 
-    fig=px.histogram(df_main,x="Main Paper Marks")
+                post["UR"]-=1
+                df.at[i,"Post"]=post["Post"]
+                df.at[i,"Allotted_Category"]="UR"
+                break
 
-    st.plotly_chart(fig,use_container_width=True)
+            cat=row["Category"]
 
-    # PDF
+            if post[cat]>0:
 
-    pdf=generate_pdf(cutoff_df)
+                post[cat]-=1
+                df.at[i,"Post"]=post["Post"]
+                df.at[i,"Allotted_Category"]=cat
+                break
 
-    st.download_button(
-        "Download Report",
-        pdf,
-        file_name="ssc_report.pdf"
-    )
+    return df
 
-else:
 
-    st.warning("Marks CSV not found")
+# ---------------- STREAMLIT ---------------- #
+
+st.title("SSC CGL Real Predictor with Bonus Simulation")
+
+file="marks.csv"
+
+df=load_data(file)
+
+bonus_q=st.sidebar.number_input("Expected Computer Bonus Questions",0,10,0)
+
+bonus_marks=bonus_q*3
+
+df["Computer Marks"]=df["Computer Marks"]+bonus_marks
+
+user_marks=st.sidebar.number_input("Your Main Marks",0,390,310)
+user_comp=st.sidebar.number_input("Your Computer Marks",0,60,25)+bonus_marks
+user_cat=st.sidebar.selectbox("Category",["UR","OBC","EWS","SC","ST"])
+
+user=pd.DataFrame({
+"Main Paper Marks":[user_marks],
+"Computer Marks":[user_comp],
+"Category":[user_cat]
+})
+
+df_full=pd.concat([df,user],ignore_index=True)
+
+vacancies=get_all_vacancies()
+
+allocated=allocate(df_full,vacancies)
+
+allocated["Rank"]=allocated.index+1
+
+user_result=allocated.iloc[-1]
+
+st.metric("Predicted Rank",user_result["Rank"])
+st.metric("Predicted Post",user_result["Post"])
+
+fig=px.histogram(allocated,x="Main Paper Marks")
+
+st.plotly_chart(fig,use_container_width=True)
+
+st.dataframe(allocated.head(500))
