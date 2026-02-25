@@ -26,10 +26,16 @@ def load_data():
 
 df = load_data()
 
-st.success(f"Loaded {len(df)} candidates from GitHub dataset")
+st.success(f"Loaded {len(df)} candidates")
 
 # =========================
-# USER INPUT ON MAIN PAGE
+# CATEGORY DATA CHECK
+# =========================
+
+category_counts = df["Category"].value_counts().to_dict()
+
+# =========================
+# USER INPUT (MAIN PAGE)
 # =========================
 
 st.subheader("Enter Your Marks")
@@ -51,6 +57,19 @@ with col4:
 bonus_marks = bonus_q * 3
 
 st.info(f"Computer bonus applied: +{bonus_marks} marks")
+
+# =========================
+# CATEGORY DATA WARNING
+# =========================
+
+MIN_SAMPLE = 500
+
+if category_counts.get(user_cat, 0) < MIN_SAMPLE:
+
+    st.warning(
+        f"{user_cat} students data is lesser so prediction may show some errors. "
+        "Actual cutoff may vary due to insufficient dataset representation."
+    )
 
 # =========================
 # APPLY BONUS
@@ -197,16 +216,8 @@ c1.metric("Predicted Rank",user["Rank"])
 c2.metric("Predicted Post",user["Post"])
 c3.metric("Allotted Category",user["Allotted Category"])
 
-# Graph
-
-fig=px.histogram(df_sim,x="Main Paper Marks",title="Marks Distribution")
+fig=px.histogram(df_sim,x="Main Paper Marks")
 
 st.plotly_chart(fig,use_container_width=True)
 
-# Table
-
-st.subheader("Top 500 Allocation- Level 7 post allocation not accurate CPT Cut off not considering")
-
 st.dataframe(df_sim.head(500),use_container_width=True)
-
-
