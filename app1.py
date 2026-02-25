@@ -205,6 +205,7 @@ st.plotly_chart(fig,use_container_width=True)
 
 # Table
 
-st.subheader("Top 500 Allocation")
+st.subheader("Top 500 Allocation- Level 7 post allocation not accurate CPT Cut off not considering")
 
 st.dataframe(df_sim.head(500),use_container_width=True)
+
