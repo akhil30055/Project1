@@ -1,181 +1,201 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import os
-import io
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="SSC CGL 2025 Real Predictor", layout="wide")
 
-# ---------------- LOAD DATA ---------------- #
+st.title("SSC CGL 2025 Real Allocation Predictor (All Posts)")
 
-@st.cache_data
-def load_data(file):
+# =============================
+# FILE UPLOAD
+# =============================
 
-    df = pd.read_csv(file, encoding="latin1", on_bad_lines="skip")
+uploaded = st.file_uploader("Upload RankMitra CSV", type=["csv"])
 
-    df["Main Paper Marks"] = pd.to_numeric(df["Main Paper Marks"], errors="coerce")
-    df["Computer Marks"] = pd.to_numeric(df["Computer Marks"], errors="coerce")
+if uploaded is None:
+    st.stop()
 
-    df = df.dropna(subset=["Main Paper Marks","Computer Marks","Category"])
+df = pd.read_csv(uploaded, encoding="latin1", on_bad_lines="skip")
 
-    return df
+df["Main Paper Marks"] = pd.to_numeric(df["Main Paper Marks"], errors="coerce")
+df["Computer Marks"] = pd.to_numeric(df["Computer Marks"], errors="coerce")
 
+df = df.dropna(subset=["Main Paper Marks","Computer Marks","Category"])
 
-# ---------------- FULL OFFICIAL VACANCY ---------------- #
+# =============================
+# USER INPUT
+# =============================
 
-def get_all_vacancies():
+st.sidebar.header("Your Marks")
 
-    return [
+user_main = st.sidebar.number_input("Main Marks",0.0,390.0,310.0)
+user_comp = st.sidebar.number_input("Computer Marks",0.0,60.0,25.0)
+user_cat = st.sidebar.selectbox("Category",["UR","OBC","EWS","SC","ST"])
+
+bonus_q = st.sidebar.number_input("Expected Bonus Questions",0,10,0)
+
+bonus_marks = bonus_q * 3
+
+df["Computer Marks"] += bonus_marks
+user_comp += bonus_marks
+
+# insert user
+
+user_row = pd.DataFrame({
+"Name":["YOU"],
+"Main Paper Marks":[user_main],
+"Computer Marks":[user_comp],
+"Category":[user_cat]
+})
+
+df = pd.concat([df,user_row],ignore_index=True)
+
+# =============================
+# FULL SSC VACANCY LIST (ALL POSTS)
+# =============================
+
+vacancies = [
+
+# LEVEL 7
 
 ("L7","Inspector Examiner",68,18,24,13,14),
-("L7","Inspector Preventive",138,75,20,91,29),
-("L7","EPFO ASO",36,17,5,30,6),
-("L7","Inspector Excise",611,175,82,269,169),
-("L7","AEO ED",1,2,2,13,0),
-("L7","NIC ASO",2,0,0,0,1),
-("L7","CAT ASO",0,0,0,0,1),
-("L7","CBN Inspector",1,1,0,1,1),
-("L7","MEA ASO",44,13,0,33,10),
-("L7","ECI ASO",0,0,0,5,1),
-("L7","Meity ASO",2,0,1,0,0),
-("L7","IB ASO",100,24,19,39,15),
-("L7","CBI SI",52,12,5,18,6),
-("L7","Railway ASO",23,4,4,14,3),
+("L7","Inspector Preventive Officer",138,75,20,91,29),
+("L7","Assistant EPFO",36,17,5,30,6),
+("L7","Inspector Central Excise",611,175,82,269,169),
+("L7","Assistant Enforcement Officer",1,2,2,13,0),
+("L7","ASO NIC",2,0,0,0,1),
+("L7","ASO CAT",0,0,0,0,1),
+("L7","Inspector Narcotics",1,1,0,1,1),
+("L7","ASO MEA",44,13,0,33,10),
+("L7","ASO Election Commission",0,0,0,5,1),
+("L7","ASO MeitY",2,0,1,0,0),
+("L7","ASO IB",100,24,19,39,15),
+("L7","Sub Inspector CBI",52,12,5,18,6),
+("L7","ASO Railways",23,4,4,14,3),
 ("L7","Income Tax Inspector",176,52,39,95,27),
-("L7","CSS ASO",273,104,52,185,68),
+("L7","ASO CSS",273,104,52,185,68),
 
-("L6","Executive Assistant",89,24,12,40,18),
+# LEVEL 6
+
+("L6","Executive Assistant CBIC",89,24,12,40,18),
 ("L6","Assistant ED",0,0,0,3,0),
-("L6","Stat Investigator",50,18,12,28,10),
+("L6","Statistical Investigator",50,18,12,28,10),
 ("L6","Assistant TRAI",2,1,0,0,0),
-("L6","Assistant Language",4,0,0,1,0),
+("L6","Assistant Official Language",4,0,0,1,0),
 ("L6","Assistant MCA",0,1,0,0,0),
 ("L6","Assistant Mines",11,2,2,3,4),
 ("L6","Assistant Textiles",1,0,0,0,0),
 ("L6","Assistant Coast Guard",8,3,1,5,1),
-("L6","JSO",124,47,15,36,27),
+("L6","Junior Statistical Officer",124,47,15,36,27),
 ("L6","Assistant DFSS",1,0,0,1,1),
-("L6","ASO NCB",7,1,1,2,0),
-("L6","SI NCB",10,3,4,8,5),
-("L6","SI NIA",6,2,1,3,2),
-("L6","Assistant MOSPI",0,0,0,2,0),
-("L6","Office Superintendent",2766,1012,496,1822,657),
+("L6","Assistant NCB",7,1,1,2,0),
+("L6","Sub Inspector NCB",10,3,4,8,5),
+("L6","Sub Inspector NIA",6,2,1,3,2),
+("L6","Assistant MoSPI",0,0,0,2,0),
+("L6","Office Superintendent CBDT",2766,1012,496,1822,657),
+
+# LEVEL 5
 
 ("L5","Accountant CAG",86,31,17,28,18),
 ("L5","Auditor CGDA",477,176,88,316,117),
-("L5","Accountant Post",42,13,6,12,3),
+("L5","Accountant Posts",42,13,6,12,3),
 ("L5","Accountant CGCA",15,6,3,9,3),
+
+# LEVEL 4
 
 ("L4","UDC MSME",25,4,5,16,5),
 ("L4","Tax Assistant CBIC",256,136,82,203,94),
-("L4","UDC Science",24,9,4,16,6),
+("L4","UDC Science Tech",24,9,4,16,6),
 ("L4","UDC Narcotics",12,2,0,5,2),
-("L4","SI Narcotics",11,2,0,6,0),
+("L4","Sub Inspector Narcotics",11,2,0,6,0),
 ("L4","UDC Mines",13,2,3,4,4),
 ("L4","UDC DGDE",7,2,1,3,1),
-("L4","UDC Meity",5,1,1,2,1),
+("L4","UDC MeitY",5,1,1,2,1),
 ("L4","UDC Textiles",4,0,1,1,2),
-("L4","UDC Water",5,0,0,0,0),
+("L4","UDC Water Resources",5,0,0,0,0),
 ("L4","UDC BRO",20,1,0,0,4),
 ("L4","UDC Agriculture",2,0,0,0,1),
 ("L4","UDC Health",1,0,0,0,0),
 ("L4","Tax Assistant CBDT",572,171,80,340,86),
 
-    ]
+]
 
+# =============================
+# ALLOCATION ENGINE
+# =============================
 
-# ---------------- REAL SSC ENGINE ---------------- #
+computer_cutoff={"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
 
-def allocate(df, vacancies):
+df = df.sort_values("Main Paper Marks",ascending=False).reset_index(drop=True)
 
-    computer_cut = {"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
+df["Post"]=None
+df["Allotted Category"]=None
 
-    df = df.sort_values("Main Paper Marks", ascending=False).reset_index(drop=True)
+vac = []
 
-    df["Post"]=None
-    df["Allotted_Category"]=None
+for v in vacancies:
 
-    vacancy_dict=[]
+    vac.append({
+    "Level":v[0],
+    "Post":v[1],
+    "UR":v[2],
+    "SC":v[3],
+    "ST":v[4],
+    "OBC":v[5],
+    "EWS":v[6]
+    })
 
-    for v in vacancies:
+for i,row in df.iterrows():
 
-        level,post,ur,sc,st,obc,ews=v
+    if row["Computer Marks"] < computer_cutoff[row["Category"]]:
+        continue
 
-        vacancy_dict.append({
-            "Level":level,
-            "Post":post,
-            "UR":ur,
-            "OBC":obc,
-            "EWS":ews,
-            "SC":sc,
-            "ST":st
-        })
+    for post in vac:
 
-    for i,row in df.iterrows():
+        if post["UR"]>0:
 
-        if row["Computer Marks"] < computer_cut[row["Category"]]:
-            continue
+            post["UR"]-=1
+            df.at[i,"Post"]=post["Post"]
+            df.at[i,"Allotted Category"]="UR"
+            break
 
-        for post in vacancy_dict:
+        cat=row["Category"]
 
-            if post["UR"]>0:
+        if post[cat]>0:
 
-                post["UR"]-=1
-                df.at[i,"Post"]=post["Post"]
-                df.at[i,"Allotted_Category"]="UR"
-                break
+            post[cat]-=1
+            df.at[i,"Post"]=post["Post"]
+            df.at[i,"Allotted Category"]=cat
+            break
 
-            cat=row["Category"]
+# =============================
+# RANK
+# =============================
 
-            if post[cat]>0:
+df["Rank"]=df.index+1
 
-                post[cat]-=1
-                df.at[i,"Post"]=post["Post"]
-                df.at[i,"Allotted_Category"]=cat
-                break
+user=df[df["Name"]=="YOU"].iloc[0]
 
-    return df
+# =============================
+# DISPLAY
+# =============================
 
+c1,c2,c3=st.columns(3)
 
-# ---------------- STREAMLIT ---------------- #
+c1.metric("Predicted Rank",user["Rank"])
+c2.metric("Predicted Post",user["Post"])
+c3.metric("Allotted Category",user["Allotted Category"])
 
-st.title("SSC CGL Real Predictor with Bonus Simulation")
+# =============================
+# GRAPH
+# =============================
 
-file="marks.csv"
+fig=px.histogram(df,x="Main Paper Marks")
 
-df=load_data(file)
+st.plotly_chart(fig)
 
-bonus_q=st.sidebar.number_input("Expected Computer Bonus Questions",0,10,0)
+# =============================
+# TABLE
+# =============================
 
-bonus_marks=bonus_q*3
-
-df["Computer Marks"]=df["Computer Marks"]+bonus_marks
-
-user_marks=st.sidebar.number_input("Your Main Marks",0,390,310)
-user_comp=st.sidebar.number_input("Your Computer Marks",0,60,25)+bonus_marks
-user_cat=st.sidebar.selectbox("Category",["UR","OBC","EWS","SC","ST"])
-
-user=pd.DataFrame({
-"Main Paper Marks":[user_marks],
-"Computer Marks":[user_comp],
-"Category":[user_cat]
-})
-
-df_full=pd.concat([df,user],ignore_index=True)
-
-vacancies=get_all_vacancies()
-
-allocated=allocate(df_full,vacancies)
-
-allocated["Rank"]=allocated.index+1
-
-user_result=allocated.iloc[-1]
-
-st.metric("Predicted Rank",user_result["Rank"])
-st.metric("Predicted Post",user_result["Post"])
-
-fig=px.histogram(allocated,x="Main Paper Marks")
-
-st.plotly_chart(fig,use_container_width=True)
-
-st.dataframe(allocated.head(500))
+st.dataframe(df.head(500))
