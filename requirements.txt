@@ -1,0 +1,11 @@
+streamlit
+pandas
+plotly
+reportlab
+numpy
+fpdf
+fpdf2
+
+
+
+
