@@ -2,44 +2,66 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="SSC CGL 2025 Real Predictor", layout="wide")
+st.set_page_config(page_title="SSC CGL Real Predictor", layout="wide")
 
-st.title("SSC CGL 2025 Real Allocation Predictor (All Posts)")
+st.title("SSC CGL 2025 Real Allocation Predictor")
 
-# =============================
-# FILE UPLOAD
-# =============================
+# =========================
+# LOAD DATA FROM GITHUB
+# =========================
 
-uploaded = st.file_uploader("Upload RankMitra CSV", type=["csv"])
+@st.cache_data
+def load_data():
 
-if uploaded is None:
-    st.stop()
+    url = "https://raw.githubusercontent.com/akhil30055/Cglscoresheets/refs/heads/main/cgl-data.json"
 
-df = pd.read_csv(uploaded, encoding="latin1", on_bad_lines="skip")
+    df = pd.read_json(url)
 
-df["Main Paper Marks"] = pd.to_numeric(df["Main Paper Marks"], errors="coerce")
-df["Computer Marks"] = pd.to_numeric(df["Computer Marks"], errors="coerce")
+    df["Main Paper Marks"] = pd.to_numeric(df["Main Paper Marks"], errors="coerce")
+    df["Computer Marks"] = pd.to_numeric(df["Computer Marks"], errors="coerce")
 
-df = df.dropna(subset=["Main Paper Marks","Computer Marks","Category"])
+    df = df.dropna(subset=["Main Paper Marks","Computer Marks","Category"])
 
-# =============================
-# USER INPUT
-# =============================
+    return df
 
-st.sidebar.header("Your Marks")
+df = load_data()
 
-user_main = st.sidebar.number_input("Main Marks",0.0,390.0,310.0)
-user_comp = st.sidebar.number_input("Computer Marks",0.0,60.0,25.0)
-user_cat = st.sidebar.selectbox("Category",["UR","OBC","EWS","SC","ST"])
+st.success(f"Loaded {len(df)} candidates from GitHub dataset")
 
-bonus_q = st.sidebar.number_input("Expected Bonus Questions",0,10,0)
+# =========================
+# USER INPUT ON MAIN PAGE
+# =========================
+
+st.subheader("Enter Your Marks")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    user_main = st.number_input("Main Paper Marks",0.0,390.0,310.0)
+
+with col2:
+    user_comp = st.number_input("Computer Marks",0.0,60.0,25.0)
+
+with col3:
+    user_cat = st.selectbox("Category",["UR","OBC","EWS","SC","ST"])
+
+with col4:
+    bonus_q = st.number_input("Expected Computer Bonus Questions",0,10,0)
 
 bonus_marks = bonus_q * 3
 
-df["Computer Marks"] += bonus_marks
+st.info(f"Computer bonus applied: +{bonus_marks} marks")
+
+# =========================
+# APPLY BONUS
+# =========================
+
+df_sim = df.copy()
+
+df_sim["Computer Marks"] += bonus_marks
 user_comp += bonus_marks
 
-# insert user
+# Insert user
 
 user_row = pd.DataFrame({
 "Name":["YOU"],
@@ -48,15 +70,13 @@ user_row = pd.DataFrame({
 "Category":[user_cat]
 })
 
-df = pd.concat([df,user_row],ignore_index=True)
+df_sim = pd.concat([df_sim,user_row],ignore_index=True)
 
-# =============================
-# FULL SSC VACANCY LIST (ALL POSTS)
-# =============================
+# =========================
+# FULL VACANCY LIST
+# =========================
 
 vacancies = [
-
-# LEVEL 7
 
 ("L7","Inspector Examiner",68,18,24,13,14),
 ("L7","Inspector Preventive Officer",138,75,20,91,29),
@@ -75,8 +95,6 @@ vacancies = [
 ("L7","Income Tax Inspector",176,52,39,95,27),
 ("L7","ASO CSS",273,104,52,185,68),
 
-# LEVEL 6
-
 ("L6","Executive Assistant CBIC",89,24,12,40,18),
 ("L6","Assistant ED",0,0,0,3,0),
 ("L6","Statistical Investigator",50,18,12,28,10),
@@ -94,14 +112,10 @@ vacancies = [
 ("L6","Assistant MoSPI",0,0,0,2,0),
 ("L6","Office Superintendent CBDT",2766,1012,496,1822,657),
 
-# LEVEL 5
-
 ("L5","Accountant CAG",86,31,17,28,18),
 ("L5","Auditor CGDA",477,176,88,316,117),
 ("L5","Accountant Posts",42,13,6,12,3),
 ("L5","Accountant CGCA",15,6,3,9,3),
-
-# LEVEL 4
 
 ("L4","UDC MSME",25,4,5,16,5),
 ("L4","Tax Assistant CBIC",256,136,82,203,94),
@@ -120,23 +134,22 @@ vacancies = [
 
 ]
 
-# =============================
+# =========================
 # ALLOCATION ENGINE
-# =============================
+# =========================
 
 computer_cutoff={"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
 
-df = df.sort_values("Main Paper Marks",ascending=False).reset_index(drop=True)
+df_sim = df_sim.sort_values("Main Paper Marks",ascending=False).reset_index(drop=True)
 
-df["Post"]=None
-df["Allotted Category"]=None
+df_sim["Post"]=None
+df_sim["Allotted Category"]=None
 
-vac = []
+vac=[]
 
 for v in vacancies:
 
     vac.append({
-    "Level":v[0],
     "Post":v[1],
     "UR":v[2],
     "SC":v[3],
@@ -145,7 +158,7 @@ for v in vacancies:
     "EWS":v[6]
     })
 
-for i,row in df.iterrows():
+for i,row in df_sim.iterrows():
 
     if row["Computer Marks"] < computer_cutoff[row["Category"]]:
         continue
@@ -155,8 +168,8 @@ for i,row in df.iterrows():
         if post["UR"]>0:
 
             post["UR"]-=1
-            df.at[i,"Post"]=post["Post"]
-            df.at[i,"Allotted Category"]="UR"
+            df_sim.at[i,"Post"]=post["Post"]
+            df_sim.at[i,"Allotted Category"]="UR"
             break
 
         cat=row["Category"]
@@ -164,21 +177,19 @@ for i,row in df.iterrows():
         if post[cat]>0:
 
             post[cat]-=1
-            df.at[i,"Post"]=post["Post"]
-            df.at[i,"Allotted Category"]=cat
+            df_sim.at[i,"Post"]=post["Post"]
+            df_sim.at[i,"Allotted Category"]=cat
             break
 
-# =============================
-# RANK
-# =============================
+df_sim["Rank"]=df_sim.index+1
 
-df["Rank"]=df.index+1
+user=df_sim[df_sim["Name"]=="YOU"].iloc[0]
 
-user=df[df["Name"]=="YOU"].iloc[0]
+# =========================
+# RESULT DISPLAY
+# =========================
 
-# =============================
-# DISPLAY
-# =============================
+st.subheader("Prediction Result")
 
 c1,c2,c3=st.columns(3)
 
@@ -186,16 +197,14 @@ c1.metric("Predicted Rank",user["Rank"])
 c2.metric("Predicted Post",user["Post"])
 c3.metric("Allotted Category",user["Allotted Category"])
 
-# =============================
-# GRAPH
-# =============================
+# Graph
 
-fig=px.histogram(df,x="Main Paper Marks")
+fig=px.histogram(df_sim,x="Main Paper Marks",title="Marks Distribution")
 
-st.plotly_chart(fig)
+st.plotly_chart(fig,use_container_width=True)
 
-# =============================
-# TABLE
-# =============================
+# Table
 
-st.dataframe(df.head(500))
+st.subheader("Top 500 Allocation")
+
+st.dataframe(df_sim.head(500),use_container_width=True)
