@@ -29,7 +29,13 @@ df = load_data()
 st.success(f"Loaded {len(df)} candidates")
 
 # =========================
-# USER INPUT
+# CATEGORY DATA CHECK
+# =========================
+
+category_counts = df["Category"].value_counts().to_dict()
+
+# =========================
+# USER INPUT (MAIN PAGE)
 # =========================
 
 st.subheader("Enter Your Marks")
@@ -53,6 +59,19 @@ bonus_marks = bonus_q * 3
 st.info(f"Computer bonus applied: +{bonus_marks} marks")
 
 # =========================
+# CATEGORY DATA WARNING
+# =========================
+
+MIN_SAMPLE = 500
+
+if category_counts.get(user_cat, 0) < MIN_SAMPLE:
+
+    st.warning(
+        f"{user_cat} students data is lesser so prediction may show some errors. "
+        "Actual cutoff may vary due to insufficient dataset representation."
+    )
+
+# =========================
 # APPLY BONUS
 # =========================
 
@@ -60,6 +79,8 @@ df_sim = df.copy()
 
 df_sim["Computer Marks"] += bonus_marks
 user_comp += bonus_marks
+
+# Insert user
 
 user_row = pd.DataFrame({
 "Name":["YOU"],
@@ -71,7 +92,7 @@ user_row = pd.DataFrame({
 df_sim = pd.concat([df_sim,user_row],ignore_index=True)
 
 # =========================
-# VACANCY LIST
+# FULL VACANCY LIST
 # =========================
 
 vacancies = [
@@ -133,20 +154,6 @@ vacancies = [
 ]
 
 # =========================
-# USER POST PREFERENCES
-# =========================
-
-st.subheader("Select Your Post Preferences")
-
-post_names = [v[1] for v in vacancies]
-
-preferences = st.multiselect(
-    "Select preferred posts",
-    post_names,
-    default=post_names[:5]
-)
-
-# =========================
 # ALLOCATION ENGINE
 # =========================
 
@@ -198,7 +205,7 @@ df_sim["Rank"]=df_sim.index+1
 user=df_sim[df_sim["Name"]=="YOU"].iloc[0]
 
 # =========================
-# RESULT
+# RESULT DISPLAY
 # =========================
 
 st.subheader("Prediction Result")
@@ -209,64 +216,9 @@ c1.metric("Predicted Rank",user["Rank"])
 c2.metric("Predicted Post",user["Post"])
 c3.metric("Allotted Category",user["Allotted Category"])
 
-# =========================
-# POST PROBABILITY ANALYSIS
-# =========================
-
-st.subheader("Post Probability Analysis")
-
-analysis=[]
-
-for v in vacancies:
-
-    post=v[1]
-
-    post_data=df_sim[df_sim["Post"]==post]
-
-    if len(post_data)==0:
-        continue
-
-    cutoff=post_data["Main Paper Marks"].min()
-
-    diff=user_main-cutoff
-
-    if diff>=10:
-        prob="HIGHLY LIKELY"
-    elif diff>=3:
-        prob="FAIR CHANCE"
-    elif diff>=-3:
-        prob="BORDERLINE"
-    else:
-        prob="UNLIKELY"
-
-    analysis.append({
-        "Post":post,
-        "Expected Cutoff":cutoff,
-        "Your Marks":user_main,
-        "Difference":diff,
-        "Probability":prob
-    })
-
-analysis_df=pd.DataFrame(analysis)
-
-st.dataframe(analysis_df)
-
-# =========================
-# PREFERENCE MATCH
-# =========================
-
-st.subheader("Your Preference Match")
-
-pref_df=analysis_df[analysis_df["Post"].isin(preferences)]
-
-st.dataframe(pref_df)
-
-# =========================
-# GRAPH
-# =========================
-
 fig=px.histogram(df_sim,x="Main Paper Marks")
 
 st.plotly_chart(fig,use_container_width=True)
 
-st.dataframe(df_sim.head(500))
+st.dataframe(df_sim.head(500),use_container_width=True)
+
