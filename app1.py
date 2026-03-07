@@ -62,10 +62,7 @@ cpt_cutoff={
 
 typing_error=st.number_input("Expected DEST Typing Error %",0.0,20.0,3.0)
 
-if user_cat=="UR":
-    dest_pass=typing_error<=5
-else:
-    dest_pass=typing_error<=7
+dest_pass = typing_error <= (5 if user_cat=="UR" else 7)
 
 # ---------------- APPLY BONUS ---------------- #
 
@@ -87,7 +84,6 @@ df_sim=pd.concat([df_sim,user_row],ignore_index=True)
 
 posts=[
 
-# LEVEL 7 (priority order)
 ("L7","ASO CSS",398,147,74,265,98,"CPT"),
 ("L7","Income Tax Inspector",188,55,37,102,30,"NONE"),
 ("L7","Inspector Examiner",68,18,24,13,14,"CPT"),
@@ -98,79 +94,91 @@ posts=[
 ("L7","Inspector Central Excise",611,175,82,269,169,"CPT"),
 ("L7","Sub Inspector CBI",52,12,5,18,6,"NONE"),
 
-# LEVEL 6
 ("L6","Executive Assistant CBIC",89,24,12,40,18,"CPT"),
 ("L6","Section Head DGFT",22,10,5,15,5,"CPT"),
 ("L6","Assistant Commerce",2,0,0,0,0,"CPT"),
 ("L6","Office Superintendent CBDT",2709,983,498,1791,645,"NONE"),
 
-# LEVEL 5
 ("L5","Auditor CGDA",477,176,88,316,117,"NONE"),
 ("L5","Accountant CAG",86,31,17,28,18,"NONE"),
 
-# LEVEL 4
 ("L4","Tax Assistant CBDT",617,162,78,347,90,"DEST"),
 ("L4","Tax Assistant CBIC",256,136,82,203,94,"DEST")
 ]
 
-# ---------------- ALLOCATION ENGINE ---------------- #
-
 computer_cutoff={"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
 
-df_sim=df_sim.sort_values("Main Paper Marks",ascending=False).reset_index(drop=True)
+# ---------------- ALLOCATION FUNCTION ---------------- #
 
-df_sim["Post"]=None
-df_sim["Allotted Category"]=None
+def run_allocation(df_base,cpt_cut):
 
-vacancies=[]
+    df_alloc=df_base.copy()
+    df_alloc=df_alloc.sort_values("Main Paper Marks",ascending=False).reset_index(drop=True)
 
-for p in posts:
+    df_alloc["Post"]=None
+    df_alloc["Allotted Category"]=None
 
-    vacancies.append({
-    "Level":p[0],
-    "Post":p[1],
-    "UR":p[2],
-    "SC":p[3],
-    "ST":p[4],
-    "OBC":p[5],
-    "EWS":p[6],
-    "Test":p[7]
-    })
+    vacancies=[]
 
-for i,row in df_sim.iterrows():
+    for p in posts:
+        vacancies.append({
+        "Level":p[0],
+        "Post":p[1],
+        "UR":p[2],
+        "SC":p[3],
+        "ST":p[4],
+        "OBC":p[5],
+        "EWS":p[6],
+        "Test":p[7]
+        })
 
-    if row["Computer Marks"]<computer_cutoff[row["Category"]]:
-        continue
+    for i,row in df_alloc.iterrows():
 
-    for post in vacancies:
+        if row["Computer Marks"] < computer_cutoff[row["Category"]]:
+            continue
 
-        if post["Test"]=="CPT":
-            if row["Computer Marks"]<cpt_cutoff[row["Category"]]:
-                continue
+        for post in vacancies:
 
-        if post["Test"]=="DEST":
-            if not dest_pass:
-                continue
+            if post["Test"]=="CPT":
+                if row["Computer Marks"] < cpt_cut[row["Category"]]:
+                    continue
 
-        if post["UR"]>0:
-            post["UR"]-=1
-            df_sim.at[i,"Post"]=post["Post"]
-            df_sim.at[i,"Allotted Category"]="UR"
-            break
+            if post["Test"]=="DEST":
+                if not dest_pass:
+                    continue
 
-        cat=row["Category"]
+            if post["UR"]>0:
+                post["UR"]-=1
+                df_alloc.at[i,"Post"]=post["Post"]
+                df_alloc.at[i,"Allotted Category"]="UR"
+                break
 
-        if post[cat]>0:
-            post[cat]-=1
-            df_sim.at[i,"Post"]=post["Post"]
-            df_sim.at[i,"Allotted Category"]=cat
-            break
+            cat=row["Category"]
 
-df_sim["Rank"]=df_sim.index+1
+            if post[cat]>0:
+                post[cat]-=1
+                df_alloc.at[i,"Post"]=post["Post"]
+                df_alloc.at[i,"Allotted Category"]=cat
+                break
 
-user=df_sim[df_sim["Name"]=="YOU"].iloc[0]
+    df_alloc["Rank"]=df_alloc.index+1
 
-# ---------------- RESULT ---------------- #
+    return df_alloc
+
+
+# ---------------- THREE SCENARIOS ---------------- #
+
+real_df = run_allocation(df_sim,cpt_cutoff)
+
+opt_cpt={k:v-2 for k,v in cpt_cutoff.items()}
+optimistic_df = run_allocation(df_sim,opt_cpt)
+
+worst_cpt={k:v+2 for k,v in cpt_cutoff.items()}
+worst_df = run_allocation(df_sim,worst_cpt)
+
+# ---------------- USER RESULT ---------------- #
+
+user=real_df[real_df["Name"]=="YOU"].iloc[0]
 
 st.subheader("Prediction")
 
@@ -178,9 +186,51 @@ c1,c2,c3=st.columns(3)
 
 c1.metric("Predicted Rank",user["Rank"])
 c2.metric("Predicted Post",user["Post"])
-c3.metric("Category",user["Allotted Category"])
+c3.metric("Allotted Category",user["Allotted Category"])
 
-fig=px.histogram(df_sim,x="Main Paper Marks")
+# ---------------- CUT OFF CALCULATION ---------------- #
+
+def cutoff_table(df):
+
+    rows=[]
+
+    for post in df["Post"].dropna().unique():
+
+        for cat in ["UR","OBC","EWS","SC","ST"]:
+
+            subset=df[(df["Post"]==post) & (df["Allotted Category"]==cat)]
+
+            cutoff=subset["Main Paper Marks"].min() if len(subset)>0 else None
+
+            rows.append({
+            "Post":post,
+            "Category":cat,
+            "Cutoff":cutoff
+            })
+
+    return pd.DataFrame(rows)
+
+opt_cut=cutoff_table(optimistic_df)
+real_cut=cutoff_table(real_df)
+worst_cut=cutoff_table(worst_df)
+
+st.subheader("Expected Post Wise Cutoff")
+
+tabs=st.tabs(["Optimistic","Realistic","Worst Case"])
+
+with tabs[0]:
+    st.dataframe(opt_cut)
+
+with tabs[1]:
+    st.dataframe(real_cut)
+
+with tabs[2]:
+    st.dataframe(worst_cut)
+
+# ---------------- CHART ---------------- #
+
+fig=px.histogram(real_df,x="Main Paper Marks")
+
 st.plotly_chart(fig,use_container_width=True)
 
-st.dataframe(df_sim.head(500))
+st.dataframe(real_df.head(500))
