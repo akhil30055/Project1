@@ -2,9 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="SSC CGL Predictor", layout="wide")
+st.set_page_config(page_title="CGL Allocation Study Tool", layout="wide")
 
-st.title("SSC CGL 2025 Smart Allocation Predictor")
+st.title("CGL Allocation Study Simulator")
+
+st.info(
+"This tool is created for study and analytical purposes only. "
+"It is not affiliated with any government organisation."
+)
 
 # ---------------- LOAD DATA ---------------- #
 
@@ -17,34 +22,33 @@ def load_data():
     df["Computer Marks"]=pd.to_numeric(df["Computer Marks"],errors="coerce")
 
     df=df.dropna(subset=["Main Paper Marks","Computer Marks","Category"])
-
     return df
 
 df=load_data()
 
 st.success(f"Loaded {len(df)} candidates")
 
-# ---------------- USER INPUT ---------------- #
+# ---------------- USER MARK INPUT ---------------- #
 
 st.subheader("Enter Your Marks")
 
-c1,c2,c3,c4=st.columns(4)
+col1,col2,col3,col4=st.columns(4)
 
-with c1:
+with col1:
     user_main=st.number_input("Main Marks",0.0,390.0,310.0)
 
-with c2:
+with col2:
     user_comp=st.number_input("Computer Marks",0.0,60.0,25.0)
 
-with c3:
+with col3:
     user_cat=st.selectbox("Category",["UR","OBC","EWS","SC","ST"])
 
-with c4:
+with col4:
     bonus_q=st.number_input("Expected Computer Bonus Questions",0,10,0)
 
 bonus_marks=bonus_q*3
 
-# ---------------- CPT CUT OFF ---------------- #
+# ---------------- CPT INPUT ---------------- #
 
 st.subheader("Expected CPT Cutoff")
 
@@ -58,11 +62,43 @@ cpt_cutoff={
 "ST":c5.number_input("ST",0,60,21)
 }
 
-# ---------------- DEST ---------------- #
+# ---------------- DEST INPUT ---------------- #
 
 typing_error=st.number_input("Expected DEST Typing Error %",0.0,20.0,3.0)
 
 dest_pass = typing_error <= (5 if user_cat=="UR" else 7)
+
+# ---------------- POSTS ---------------- #
+
+posts=[
+
+"ASO CSS",
+"Income Tax Inspector",
+"Inspector Examiner",
+"Inspector Preventive Officer",
+"Assistant Enforcement Officer",
+"ASO MEA",
+"ASO IB",
+"Inspector Central Excise",
+"Sub Inspector CBI",
+"Executive Assistant CBIC",
+"Section Head DGFT",
+"Office Superintendent CBDT",
+"Auditor CGDA",
+"Accountant CAG",
+"Tax Assistant CBDT",
+"Tax Assistant CBIC"
+]
+
+# ---------------- POST PREFERENCE INPUT ---------------- #
+
+st.subheader("Choose Your Post Preference Order")
+
+pref=st.multiselect(
+"Arrange posts in your preference order (top = most preferred)",
+posts,
+default=posts
+)
 
 # ---------------- APPLY BONUS ---------------- #
 
@@ -80,157 +116,101 @@ user_row=pd.DataFrame({
 
 df_sim=pd.concat([df_sim,user_row],ignore_index=True)
 
-# ---------------- POST STRUCTURE ---------------- #
+# ---------------- VACANCY ---------------- #
 
-posts=[
+vacancy={
 
-("L7","ASO CSS",398,147,74,265,98,"CPT"),
-("L7","Income Tax Inspector",188,55,37,102,30,"NONE"),
-("L7","Inspector Examiner",68,18,24,13,14,"CPT"),
-("L7","Inspector Preventive Officer",138,75,20,91,29,"CPT"),
-("L7","Assistant Enforcement Officer",1,2,2,13,0,"NONE"),
-("L7","ASO MEA",46,17,6,30,11,"CPT"),
-("L7","ASO IB",100,24,19,39,15,"NONE"),
-("L7","Inspector Central Excise",611,175,82,269,169,"CPT"),
-("L7","Sub Inspector CBI",52,12,5,18,6,"NONE"),
+"ASO CSS":{"UR":398,"OBC":265,"EWS":98,"SC":147,"ST":74},
+"Income Tax Inspector":{"UR":188,"OBC":102,"EWS":30,"SC":55,"ST":37},
+"Inspector Examiner":{"UR":68,"OBC":13,"EWS":14,"SC":18,"ST":24},
+"Inspector Preventive Officer":{"UR":138,"OBC":91,"EWS":29,"SC":75,"ST":20},
+"Assistant Enforcement Officer":{"UR":1,"OBC":13,"EWS":0,"SC":2,"ST":2},
+"ASO MEA":{"UR":46,"OBC":30,"EWS":11,"SC":17,"ST":6},
+"ASO IB":{"UR":100,"OBC":39,"EWS":15,"SC":24,"ST":19},
+"Inspector Central Excise":{"UR":611,"OBC":269,"EWS":169,"SC":175,"ST":82},
+"Sub Inspector CBI":{"UR":52,"OBC":18,"EWS":6,"SC":12,"ST":5},
+"Executive Assistant CBIC":{"UR":89,"OBC":40,"EWS":18,"SC":24,"ST":12},
+"Section Head DGFT":{"UR":22,"OBC":15,"EWS":5,"SC":10,"ST":5},
+"Office Superintendent CBDT":{"UR":2709,"OBC":1791,"EWS":645,"SC":983,"ST":498},
+"Auditor CGDA":{"UR":477,"OBC":316,"EWS":117,"SC":176,"ST":88},
+"Accountant CAG":{"UR":86,"OBC":28,"EWS":18,"SC":31,"ST":17},
+"Tax Assistant CBDT":{"UR":617,"OBC":347,"EWS":90,"SC":162,"ST":78},
+"Tax Assistant CBIC":{"UR":256,"OBC":203,"EWS":94,"SC":136,"ST":82}
 
-("L6","Executive Assistant CBIC",89,24,12,40,18,"CPT"),
-("L6","Section Head DGFT",22,10,5,15,5,"CPT"),
-("L6","Assistant Commerce",2,0,0,0,0,"CPT"),
-("L6","Office Superintendent CBDT",2709,983,498,1791,645,"NONE"),
+}
 
-("L5","Auditor CGDA",477,176,88,316,117,"NONE"),
-("L5","Accountant CAG",86,31,17,28,18,"NONE"),
-
-("L4","Tax Assistant CBDT",617,162,78,347,90,"DEST"),
-("L4","Tax Assistant CBIC",256,136,82,203,94,"DEST")
-]
+# ---------------- ALLOCATION ENGINE ---------------- #
 
 computer_cutoff={"UR":18,"OBC":15,"EWS":15,"SC":12,"ST":12}
 
-# ---------------- ALLOCATION FUNCTION ---------------- #
+df_sim=df_sim.sort_values("Main Paper Marks",ascending=False).reset_index(drop=True)
 
-def run_allocation(df_base,cpt_cut):
+df_sim["Post"]=None
+df_sim["Allotted Category"]=None
 
-    df_alloc=df_base.copy()
-    df_alloc=df_alloc.sort_values("Main Paper Marks",ascending=False).reset_index(drop=True)
+for i,row in df_sim.iterrows():
 
-    df_alloc["Post"]=None
-    df_alloc["Allotted Category"]=None
+    if row["Computer Marks"]<computer_cutoff[row["Category"]]:
+        continue
 
-    vacancies=[]
+    for p in pref:
 
-    for p in posts:
-        vacancies.append({
-        "Level":p[0],
-        "Post":p[1],
-        "UR":p[2],
-        "SC":p[3],
-        "ST":p[4],
-        "OBC":p[5],
-        "EWS":p[6],
-        "Test":p[7]
-        })
+        if vacancy[p]["UR"]>0:
+            vacancy[p]["UR"]-=1
+            df_sim.at[i,"Post"]=p
+            df_sim.at[i,"Allotted Category"]="UR"
+            break
 
-    for i,row in df_alloc.iterrows():
+        cat=row["Category"]
 
-        if row["Computer Marks"] < computer_cutoff[row["Category"]]:
-            continue
+        if vacancy[p][cat]>0:
+            vacancy[p][cat]-=1
+            df_sim.at[i,"Post"]=p
+            df_sim.at[i,"Allotted Category"]=cat
+            break
 
-        for post in vacancies:
-
-            if post["Test"]=="CPT":
-                if row["Computer Marks"] < cpt_cut[row["Category"]]:
-                    continue
-
-            if post["Test"]=="DEST":
-                if not dest_pass:
-                    continue
-
-            if post["UR"]>0:
-                post["UR"]-=1
-                df_alloc.at[i,"Post"]=post["Post"]
-                df_alloc.at[i,"Allotted Category"]="UR"
-                break
-
-            cat=row["Category"]
-
-            if post[cat]>0:
-                post[cat]-=1
-                df_alloc.at[i,"Post"]=post["Post"]
-                df_alloc.at[i,"Allotted Category"]=cat
-                break
-
-    df_alloc["Rank"]=df_alloc.index+1
-
-    return df_alloc
-
-
-# ---------------- THREE SCENARIOS ---------------- #
-
-real_df = run_allocation(df_sim,cpt_cutoff)
-
-opt_cpt={k:v-2 for k,v in cpt_cutoff.items()}
-optimistic_df = run_allocation(df_sim,opt_cpt)
-
-worst_cpt={k:v+2 for k,v in cpt_cutoff.items()}
-worst_df = run_allocation(df_sim,worst_cpt)
+df_sim["Rank"]=df_sim.index+1
 
 # ---------------- USER RESULT ---------------- #
 
-user=real_df[real_df["Name"]=="YOU"].iloc[0]
+user=df_sim[df_sim["Name"]=="YOU"].iloc[0]
 
-st.subheader("Prediction")
+st.subheader("Prediction Result")
 
 c1,c2,c3=st.columns(3)
 
 c1.metric("Predicted Rank",user["Rank"])
 c2.metric("Predicted Post",user["Post"])
-c3.metric("Allotted Category",user["Allotted Category"])
+c3.metric("Category",user["Allotted Category"])
 
-# ---------------- CUT OFF CALCULATION ---------------- #
-
-def cutoff_table(df):
-
-    rows=[]
-
-    for post in df["Post"].dropna().unique():
-
-        for cat in ["UR","OBC","EWS","SC","ST"]:
-
-            subset=df[(df["Post"]==post) & (df["Allotted Category"]==cat)]
-
-            cutoff=subset["Main Paper Marks"].min() if len(subset)>0 else None
-
-            rows.append({
-            "Post":post,
-            "Category":cat,
-            "Cutoff":cutoff
-            })
-
-    return pd.DataFrame(rows)
-
-opt_cut=cutoff_table(optimistic_df)
-real_cut=cutoff_table(real_df)
-worst_cut=cutoff_table(worst_df)
+# ---------------- CUT OFF TABLE ---------------- #
 
 st.subheader("Expected Post Wise Cutoff")
 
-tabs=st.tabs(["Optimistic","Realistic","Worst Case"])
+cutoff_rows=[]
 
-with tabs[0]:
-    st.dataframe(opt_cut)
+for p in posts:
 
-with tabs[1]:
-    st.dataframe(real_cut)
+    for cat in ["UR","OBC","EWS","SC","ST"]:
 
-with tabs[2]:
-    st.dataframe(worst_cut)
+        subset=df_sim[(df_sim["Post"]==p)&(df_sim["Allotted Category"]==cat)]
 
-# ---------------- CHART ---------------- #
+        cutoff=subset["Main Paper Marks"].min() if len(subset)>0 else None
 
-fig=px.histogram(real_df,x="Main Paper Marks")
+        cutoff_rows.append({
+        "Post":p,
+        "Category":cat,
+        "Cutoff":cutoff
+        })
+
+cut_df=pd.DataFrame(cutoff_rows)
+
+st.dataframe(cut_df)
+
+# ---------------- DISTRIBUTION CHART ---------------- #
+
+fig=px.histogram(df_sim,x="Main Paper Marks")
 
 st.plotly_chart(fig,use_container_width=True)
 
-st.dataframe(real_df.head(500))
+st.dataframe(df_sim.head(500))
